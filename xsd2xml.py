@@ -3,8 +3,10 @@
 # 0x0fa07 [at] gmail.com
 
 from argparse import ArgumentParser
+
+import logging
 import xmlschema
-from xmlschema.components import (
+from xmlschema.validators import (
     XsdElement,
     XsdAnyElement,
     XsdComplexType,
@@ -14,13 +16,14 @@ from xmlschema.components import (
     XsdUnion
 )
 
+
 # sample data is hardcoded
 def valsmap(v):
     # numeric types
-    v['decimal']    = '-3.72'
-    v['float']      = '-42.217E11'
-    v['double']     = '+24.3e-3'
-    v['integer']    = '-176'
+    v['decimal'] = '-3.72'
+    v['float'] = '-42.217E11'
+    v['double'] = '+24.3e-3'
+    v['integer'] = '-176'
     v['positiveInteger'] = '+3'
     v['negativeInteger'] = '-7'
     v['nonPositiveInteger'] = '-34'
@@ -67,7 +70,6 @@ def valsmap(v):
     v['notation'] = 'asd'
 
 
-
 class GenXML:
     def __init__(self, xsd, elem, enable_choice):
         self.xsd = xmlschema.XMLSchema(xsd)
@@ -75,7 +77,7 @@ class GenXML:
         self.enable_choice = enable_choice
         self.root = True
         self.vals = {}
-    
+
     # shorten the namespace
     def short_ns(self, ns):
         for k, v in self.xsd.namespaces.iteritems():
@@ -84,7 +86,7 @@ class GenXML:
             if v == ns:
                 return k
         return ''
-    
+
     # if name is using long namespace,
     # lets replace it with the short one
     def use_short_ns(self, name):
@@ -93,8 +95,7 @@ class GenXML:
             ns = name[1:x]
             return self.short_ns(ns) + ":" + name[x + 1:]
         return name
-    
-    
+
     # remove the namespace in name
     def remove_ns(self, name):
         if name[0] == '{':
@@ -106,7 +107,6 @@ class GenXML:
     def print_header(self):
         print "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>"
 
-    
     # put all defined namespaces as a string
     def ns_map_str(self):
         ns_all = ''
@@ -116,7 +116,6 @@ class GenXML:
             else:
                 ns_all += 'xmlns:' + k + '=\"' + v + '\"' + ' '
         return ns_all
-        
 
     # start a tag with name
     def start_tag(self, name):
@@ -127,56 +126,57 @@ class GenXML:
         x += '>'
         return x
 
-
     # end a tag with name
     def end_tag(self, name):
         return '</' + name + '>'
-    
-        
+
     # make a sample data for primitive types
     def genval(self, name):
         name = self.remove_ns(name)
         if name in self.vals:
             return self.vals[name]
         return 'ERROR !'
-    
-    
+
     # print a group
     def group2xml(self, g):
-        model = str(g.model)
-        model = self.remove_ns(model)
-        nextg = g._group
-        y = len(nextg)
-        if y == 0:
-            print '<!--empty-->'
-            return
-    
-        print '<!--START:[' + model + ']-->'
-        if self.enable_choice and model == 'choice':
-            print '<!--next item is from a [choice] group with size=' + str(y) + '-->'
-        else:
-            print '<!--next ' + str(y) + ' items are in a [' + model + '] group-->'
-            
-        for ng in nextg:
-            if isinstance(ng, XsdElement):
-                self.node2xml(ng)
-            elif isinstance(ng, XsdAnyElement):
-                self.node2xml(ng)
-            else:
-                self.group2xml(ng)
-        
+        try:
+            model = str(g.model)
+            model = self.remove_ns(model)
+            nextg = g._group
+            y = len(nextg)
+            if y == 0:
+                print '<!--empty-->'
+                return
+
+            print '<!--START:[' + model + ']-->'
             if self.enable_choice and model == 'choice':
-                break
-        print '<!--END:[' + model + ']-->' 
-    
-    
-    # print a node
+                print '<!--next item is from a [choice] group with size=' + str(y) + '-->'
+            else:
+                print '<!--next ' + str(y) + ' items are in a [' + model + '] group-->'
+
+            for ng in nextg:
+                if isinstance(ng, XsdElement):
+                    self.node2xml(ng)
+                elif isinstance(ng, XsdAnyElement):
+                    self.node2xml(ng)
+                else:
+                    self.group2xml(ng)
+
+                if self.enable_choice and model == 'choice':
+                    break
+            print '<!--END:[' + model + ']-->'
+        except Exception as e:
+            logging.exception("{0}\n{1}".format(str(e), str(g)))
+
+
+            # print a node
+
     def node2xml(self, node):
         if node.min_occurs == 0:
             print '<!--next 1 item is optional (minOcuurs = 0)-->'
-        if node.max_occurs >  1:
+        if node.max_occurs > 1:
             print '<!--next 1 item is multiple (maxOccurs > 1)-->'
-        
+
         if isinstance(node, XsdAnyElement):
             print '<_ANY_/>'
             return
@@ -212,8 +212,7 @@ class GenXML:
                 print self.start_tag(n) + self.genval(tp) + self.end_tag(n)
         else:
             print 'ERROR: unknown type: ' + node.type
-    
-    
+
     # setup and print everything
     def run(self):
         valsmap(self.vals)
@@ -226,7 +225,7 @@ class GenXML:
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("-s", "--schema", dest="xsdfile", required=True, 
+    parser.add_argument("-s", "--schema", dest="xsdfile", required=True,
                         help="select the xsd used to generate xml")
     parser.add_argument("-e", "--element", dest="element", required=True,
                         help="select an element to dump xml")
@@ -239,9 +238,5 @@ def main():
     generator.run()
 
 
-
 if __name__ == "__main__":
     main()
-    
-    
-
